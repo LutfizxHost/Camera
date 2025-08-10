@@ -3,182 +3,175 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Kamera Live — Foto Live + Video</title>
+<title>Live Photo Camera</title>
 <style>
   :root{
     --bg:#000;
     --panel: rgba(10,10,10,0.6);
     --accent:#ffcc00;
-    --muted: rgba(255,255,255,0.6);
-    --white: #fff;
+    --muted: rgba(255,255,255,0.65);
+    --white: #ffffff;
   }
-  html,body{height:100%;margin:0;background:var(--bg);font-family:Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;color:var(--white);}
-  .app{display:flex;flex-direction:column;height:100vh;gap:0;overflow:hidden;}
-  /* preview */
+  html,body{height:100%;margin:0;background:var(--bg);font-family:Inter, system-ui, Roboto, "Helvetica Neue", Arial;color:var(--white);}
+  .app{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
   .preview{position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:#000;}
   video#camera{width:100%;height:100%;object-fit:cover;background:#000;transform:scaleX(1);}
-  /* overlay flash */
-  #flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity 160ms ease-out;z-index:40;}
-  /* top bar */
-  .topbar{position:absolute;top:10px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;z-index:50;gap:8px}
-  .error{background:rgba(200,0,0,0.6);padding:6px 10px;border-radius:8px;font-size:12px;display:none;color:#fff;max-width:72%}
-  .icon-btn{background:rgba(255,255,255,0.06);border:0;padding:8px;border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer}
-  .icon-btn svg{width:22px;height:22px;display:block;fill:var(--white)}
-  /* shutter & controls */
-  .controls{position:absolute;left:0;right:0;bottom:18px;display:flex;align-items:center;justify-content:center;gap:18px;z-index:50}
-  .mode-scroll{position:absolute;left:12px;right:12px;bottom:100px;display:flex;justify-content:center;z-index:50;overflow:hidden;pointer-events:none}
-  .modes{display:flex;gap:18px;padding:8px 12px;background:var(--panel);border-radius:999px;pointer-events:auto;backdrop-filter:blur(6px);}
-  .mode{color:var(--muted);padding:6px 10px;border-radius:999px;cursor:pointer;user-select:none;transition:all .22s ease}
-  .mode.active{color:var(--accent);font-weight:600;transform:translateY(-2px)}
-  .shutter-btn{width:78px;height:78px;border-radius:50%;border:4px solid var(--white);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center}
-  .shutter-indicator{width:52px;height:52px;border-radius:50%;background:var(--white)}
-  /* small action */
-  .mini-actions{display:flex;gap:10px;align-items:center}
+  /* flash overlay */
+  #flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity 140ms ease-out;z-index:40;}
+  /* error bar */
+  .error{position:absolute;top:10px;left:10px;right:10px;background:rgba(200,0,0,0.75);padding:8px 12px;border-radius:8px;font-size:13px;display:none;z-index:60;}
+  /* bottom controls layout */
+  .bottom-bar{position:absolute;left:0;right:0;bottom:14px;display:flex;align-items:center;justify-content:center;gap:18px;z-index:50;padding:0 20px;}
+  .control-slot{display:flex;align-items:center;justify-content:center;width:72px;height:72px;}
+  .live-icon{width:54px;height:54px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  /* iPhone-like concentric circles (SVG) - use stroke */
+  .shutter-wrap{width:86px;height:86px;display:flex;align-items:center;justify-content:center;border-radius:999px}
+  .shutter{width:70px;height:70px;border-radius:50%;border:5px solid var(--white);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .shutter-inner{width:46px;height:46px;border-radius:50%;background:var(--white)}
+  .switch-btn{width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;border:0;cursor:pointer}
+  .switch-btn svg{width:26px;height:26px;fill:var(--white)}
+  /* modes row above shutter (optional) */
+  .modes-row{position:absolute;bottom:100px;left:50%;transform:translateX(-50%);z-index:50;display:flex;gap:12px;padding:8px 12px;background:var(--panel);border-radius:999px;backdrop-filter:blur(6px)}
+  .mode{color:var(--muted);padding:6px 10px;border-radius:999px;cursor:pointer;user-select:none;font-weight:500}
+  .mode.active{color:var(--accent);transform:translateY(-2px)}
   .status-toast{position:absolute;left:50%;transform:translateX(-50%);bottom:170px;background:rgba(0,0,0,0.6);padding:8px 12px;border-radius:8px;font-size:13px;z-index:60;display:none}
-  /* responsive */
-  @media (max-width:420px){ .shutter-btn{width:64px;height:64px} .shutter-indicator{width:44px;height:44px} .modes{gap:10px} }
+  @media (max-width:420px){ .control-slot{width:60px;height:60px} .shutter-wrap{width:72px;height:72px} .shutter{width:56px;height:56px;border-width:4px} .shutter-inner{width:40px;height:40px} }
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="preview">
-    <video id="camera" autoplay playsinline muted></video>
-    <div id="flash" aria-hidden="true"></div>
+  <div class="app">
+    <div class="preview">
+      <video id="camera" autoplay playsinline muted></video>
+      <div id="flash" aria-hidden="true"></div>
 
-    <div class="topbar">
       <div class="error" id="errorLog" role="status" aria-live="polite"></div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button id="switchCam" class="icon-btn" title="Ganti kamera" aria-label="Ganti kamera">
-          <!-- SVG icon (rotate camera) -->
-          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-            <path d="M7 7h10v2l3-3-3-3v2H7V1H5v4H1v2h4v2h2V7zm10 10H7v-2L4 18l3 3v-2h10v4h2v-4h4v-2h-4v-2h-2v2z"/>
-          </svg>
-        </button>
-      </div>
-    </div>
+      <div class="status-toast" id="statusToast"></div>
 
-    <div class="mode-scroll" id="modeScroll">
-      <div class="modes" id="modes" role="tablist" tabindex="0">
-        <div class="mode active" data-mode="photo" role="tab">Foto</div>
-        <div class="mode" data-mode="live" role="tab">Foto Live</div>
-        <div class="mode" data-mode="video" role="tab">Video</div>
-      </div>
-    </div>
-
-    <div class="status-toast" id="statusToast"></div>
-
-    <div class="controls">
-      <div class="mini-actions" style="visibility:visible">
-        <button id="downloadThumb" class="icon-btn" title="Unduh thumbnail" style="display:none">
-          <svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2zm7-14l-5 5h3v4h4v-4h3l-5-5z"/></svg>
-        </button>
+      <div class="modes-row" id="modesRow" aria-hidden="false">
+        <div class="mode active" data-mode="photo">Foto</div>
+        <div class="mode" data-mode="live">Foto Live</div>
+        <div class="mode" data-mode="video">Video</div>
       </div>
 
-      <button id="shutter" class="shutter-btn" title="Jepret" aria-label="Jepret">
-        <div class="shutter-indicator" id="shutterInner"></div>
-      </button>
+      <div class="bottom-bar" role="toolbar" aria-label="Camera controls">
+        <!-- Left slot: Live Photo icon (iPhone-like) -->
+        <div class="control-slot" style="justify-content:flex-end;">
+          <div id="liveIcon" class="live-icon" title="Live Photo" aria-label="Live Photo">
+            <!-- concentric circles SVG like iPhone Live -->
+            <svg viewBox="0 0 64 64" width="54" height="54" aria-hidden="true">
+              <defs>
+                <linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.95"/><stop offset="1" stop-color="#fff" stop-opacity="0.75"/></linearGradient>
+              </defs>
+              <circle cx="32" cy="32" r="20" fill="none" stroke="rgba(255,255,255,0.95)" stroke-width="2"></circle>
+              <circle cx="32" cy="32" r="12" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="2"></circle>
+              <circle cx="32" cy="32" r="6" fill="rgba(255,255,255,0.95)"></circle>
+            </svg>
+          </div>
+        </div>
 
-      <div class="mini-actions">
-        <button id="recordBtn" class="icon-btn" title="Rekam" aria-label="Rekam">
-          <svg viewBox="0 0 24 24"><path d="M12 7a5 5 0 110 10 5 5 0 010-10zm9 5a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        </button>
+        <!-- Center slot: Shutter -->
+        <div class="control-slot" style="justify-content:center;">
+          <div class="shutter-wrap">
+            <button id="shutter" class="shutter" title="Jepret" aria-label="Jepret">
+              <div class="shutter-inner" id="shutterInner"></div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right slot: Switch camera -->
+        <div class="control-slot" style="justify-content:flex-start;">
+          <button id="switchCam" class="switch-btn" title="Ganti kamera" aria-label="Ganti kamera">
+            <!-- camera rotate SVG -->
+            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+              <path d="M12 6V4l-4 4 4 4V8a4 4 0 1 1 0 8v2l4-4-4-4v2a6 6 0 1 0 0-12z"></path>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
 <script>
-/* Kamera Live — HTML lengkap
-   Tips deploy: gunakan GitHub Pages (HTTPS). 
-   Jika muncul Permission denied: pastikan halaman diakses via HTTPS dan izinkan kamera. */
+/* Live Photo HTML final
+   - Deploy via GitHub Pages (HTTPS)
+   - Buka URL, izinkan kamera di browser
+   - Jika muncul permission error: cek Site settings -> Camera -> Allow
+*/
 
 const video = document.getElementById('camera');
 const flash = document.getElementById('flash');
 const errorLog = document.getElementById('errorLog');
 const statusToast = document.getElementById('statusToast');
-const modesEl = document.getElementById('modes');
 const shutter = document.getElementById('shutter');
 const switchCam = document.getElementById('switchCam');
-const recordBtn = document.getElementById('recordBtn');
-const downloadThumb = document.getElementById('downloadThumb');
+const liveIcon = document.getElementById('liveIcon');
+const modesRow = document.getElementById('modesRow');
 
 let stream = null;
-let mediaRecorder = null;
-let recordedChunks = [];
-let currentMode = 'photo'; // photo | live | video
-let useBack = true;
 let currentTrack = null;
 let imageCapture = null;
+let useBack = true;
+let currentMode = 'photo'; // photo | live | video
+let mediaRecorder = null;
+let recordedChunks = [];
 let isRecording = false;
 
-function showError(msg, show = true) {
-  if (!msg) { errorLog.style.display = 'none'; errorLog.textContent = ''; return; }
-  errorLog.style.display = 'block';
-  errorLog.textContent = msg;
+/* Utility: show error / toast */
+function showError(msg) {
+  if (!msg) { errorLog.style.display='none'; errorLog.textContent=''; return; }
+  errorLog.style.display='block'; errorLog.textContent = msg;
   console.warn(msg);
 }
-
-function showToast(msg, time = 1200) {
-  statusToast.textContent = msg;
-  statusToast.style.display = 'block';
-  setTimeout(()=> statusToast.style.display = 'none', time);
+function showToast(msg, time=1200) {
+  statusToast.textContent = msg; statusToast.style.display='block';
+  setTimeout(()=> statusToast.style.display='none', time);
 }
 
-/* flash visual */
+/* Visual flash (screen) */
 function flashScreen(ms = 140) {
   flash.style.transition = `opacity ${Math.max(80, ms/2)}ms ease-out`;
   flash.style.opacity = '1';
   setTimeout(()=> flash.style.opacity = '0', ms);
 }
 
-/* Start camera with facingMode and fallback */
+/* Start camera with facingMode (try exact then fallback) */
 async function startCamera() {
   stopStream();
-  const constraintsBase = { video: { facingMode: undefined }, audio: false };
-  // set audio when recording mode active
-  if (currentMode === 'video') constraintsBase.audio = true;
-
+  const wantAudio = (currentMode === 'video');
   const tryFacing = useBack ? 'environment' : 'user';
+
   try {
-    const constraints = { ...constraintsBase, video: { facingMode: { exact: tryFacing } } };
-    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    // first try strict exact facing (some browsers support)
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: tryFacing } }, audio: wantAudio });
   } catch (err1) {
-    // fallback attempt (looser)
+    // fallback: loose facingMode
     try {
-      const fallback = { ...constraintsBase, video: { facingMode: tryFacing } };
-      stream = await navigator.mediaDevices.getUserMedia(fallback);
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: tryFacing }, audio: wantAudio });
     } catch (err2) {
-      // final fallback to any camera
+      // final fallback: any camera
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: constraintsBase.audio });
-        showError('Camera fallback used (no facingMode). Jika muncul Permission denied, pastikan halaman HTTPS dan izinkan kamera.');
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: wantAudio });
+        showError('Fallback kamera digunakan. Jika muncul Permission denied, pastikan halaman diakses via HTTPS dan izinkan kamera.');
       } catch (err3) {
-        // permission denied or no devices
-        showError('Gagal mengakses kamera: ' + (err3 && err3.message ? err3.message : err2.message || err1.message));
+        // permission denied or no camera device available
+        showError('Could not start video source: ' + (err3?.message || err2?.message || err1?.message));
         return;
       }
     }
   }
 
+  // attach stream
   video.srcObject = stream;
   currentTrack = stream.getVideoTracks()[0] || null;
 
   // prepare ImageCapture if available
-  try {
-    if (currentTrack && window.ImageCapture) {
-      imageCapture = new ImageCapture(currentTrack);
-    } else {
-      imageCapture = null;
-    }
-  } catch (e) {
-    imageCapture = null;
-    console.warn('ImageCapture init error:', e);
-  }
+  try { imageCapture = (currentTrack && window.ImageCapture) ? new ImageCapture(currentTrack) : null; }
+  catch(e) { imageCapture = null; console.warn('ImageCapture init error', e); }
 
   showError(null);
 }
 
-/* Stop existing tracks */
+/* Stop stream */
 function stopStream() {
   if (stream) {
     stream.getTracks().forEach(t => t.stop());
@@ -187,24 +180,23 @@ function stopStream() {
   }
 }
 
-/* Toggle camera */
+/* Toggle camera (right of shutter) */
 switchCam.addEventListener('click', async () => {
   useBack = !useBack;
   await startCamera();
 });
 
-/* Mode switching */
-modesEl.addEventListener('click', (e) => {
-  const modeEl = e.target.closest('.mode');
-  if (!modeEl) return;
-  modesEl.querySelectorAll('.mode').forEach(m=>m.classList.remove('active'));
-  modeEl.classList.add('active');
-  currentMode = modeEl.dataset.mode;
-  // restart camera if needed (to refresh audio constraints)
-  startCamera();
+/* Mode switching via modes row (optional) */
+modesRow.addEventListener('click', async (e) => {
+  const el = e.target.closest('.mode');
+  if (!el) return;
+  modesRow.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
+  el.classList.add('active');
+  currentMode = el.dataset.mode;
+  await startCamera();
 });
 
-/* Snapshot helpers */
+/* helper: snapshot canvas */
 function snapshotToDataURL() {
   const w = video.videoWidth || video.clientWidth;
   const h = video.videoHeight || video.clientHeight;
@@ -214,28 +206,25 @@ function snapshotToDataURL() {
   ctx.drawImage(video, 0, 0, w, h);
   return c.toDataURL('image/jpeg', 0.95);
 }
-
 function dataURLtoBlob(dataurl) {
   const parts = dataurl.split(',');
-  const mimeMatch = parts[0].match(/:(.*?);/);
-  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const mime = parts[0].match(/:(.*?);/)[1];
   const bstr = atob(parts[1]);
-  let n = bstr.length; const u8 = new Uint8Array(n);
+  let n = bstr.length;
+  const u8 = new Uint8Array(n);
   while(n--) u8[n] = bstr.charCodeAt(n);
   return new Blob([u8], {type:mime});
 }
-
-/* download blob */
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a);
   a.click();
-  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 800);
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 900);
 }
 
-/* try enable torch (hardware) */
+/* Try enable torch (hardware) - may fail on many browsers */
 async function enableTorch(on = true) {
   if (!currentTrack || !currentTrack.getCapabilities) return false;
   try {
@@ -251,41 +240,34 @@ async function enableTorch(on = true) {
   return false;
 }
 
-/* Single photo capture (prefer ImageCapture.takePhoto) */
+/* Single photo */
 async function takePhoto() {
   if (!stream) { showError('Stream belum siap'); return; }
   try {
-    // visual flash always for feedback
     flashScreen(140);
-
     if (imageCapture && typeof imageCapture.takePhoto === 'function') {
       try {
         const blob = await imageCapture.takePhoto();
         downloadBlob(blob, `photo_${Date.now()}.jpg`);
         showToast('Foto tersimpan');
         return;
-      } catch (e) {
-        console.warn('imageCapture.takePhoto failed, fallback to canvas:', e);
+      } catch(e) {
+        console.warn('imageCapture.takePhoto failed, fallback to canvas', e);
       }
     }
-    // fallback canvas
     const data = snapshotToDataURL();
-    const blob = dataURLtoBlob(data);
-    downloadBlob(blob, `photo_${Date.now()}.jpg`);
+    downloadBlob(dataURLtoBlob(data), `photo_${Date.now()}.jpg`);
     showToast('Foto tersimpan');
   } catch (err) {
-    showError('Gagal ambil foto: ' + (err && err.message ? err.message : err));
+    showError('Gagal ambil foto: ' + (err?.message || err));
   }
 }
 
-/* Live Photo (burst) with torch attempt and fallback flash */
-async function takeLivePhoto({ burstCount = 3, gapMs = 160 } = {}) {
+/* Live Photo: burst (3) with attempt to use torch; fallback to flashScreen */
+async function takeLivePhoto({ burstCount = 3, gapMs = 140 } = {}) {
   if (!stream) { showError('Stream belum siap'); return; }
   let torchOn = false;
-  try {
-    torchOn = await enableTorch(true);
-  } catch(e){ torchOn=false; }
-
+  try { torchOn = await enableTorch(true); } catch(e){ torchOn = false; }
   const saved = [];
   for (let i=0;i<burstCount;i++) {
     try {
@@ -293,105 +275,81 @@ async function takeLivePhoto({ burstCount = 3, gapMs = 160 } = {}) {
       if (imageCapture && typeof imageCapture.takePhoto === 'function') {
         const blob = await imageCapture.takePhoto().catch(()=>null);
         if (blob) { downloadBlob(blob, `live_${Date.now()}_${i+1}.jpg`); saved.push(true); }
-        else {
-          const data = snapshotToDataURL(); downloadBlob(dataURLtoBlob(data), `live_${Date.now()}_${i+1}.jpg`); saved.push(true);
-        }
+        else { const d = snapshotToDataURL(); downloadBlob(dataURLtoBlob(d), `live_${Date.now()}_${i+1}.jpg`); saved.push(true); }
       } else {
-        const data = snapshotToDataURL(); downloadBlob(dataURLtoBlob(data), `live_${Date.now()}_${i+1}.jpg`); saved.push(true);
+        const d = snapshotToDataURL(); downloadBlob(dataURLtoBlob(d), `live_${Date.now()}_${i+1}.jpg`); saved.push(true);
       }
-    } catch (e) {
-      console.warn('capture frame error:', e);
-    }
-    await new Promise(r => setTimeout(r, gapMs));
+    } catch (e) { console.warn('capture frame error', e); }
+    await new Promise(r=>setTimeout(r, gapMs));
   }
-
   if (torchOn) {
     try { await enableTorch(false); } catch(e){ console.warn('disable torch fail', e); }
   } else {
     flashScreen(180);
   }
-
   showToast('Live Photo selesai');
   return saved;
 }
 
-/* Recording (MediaRecorder) */
+/* Recording (simple using MediaRecorder) */
 async function startRecording() {
   if (!stream) { showError('Stream belum siap'); return; }
   recordedChunks = [];
   try {
-    // Use MediaRecorder with preferred mime
-    const options = { mimeType: 'video/webm;codecs=vp8,opus' };
+    let options = { mimeType: 'video/webm;codecs=vp8,opus' };
     mediaRecorder = new MediaRecorder(stream, options);
-  } catch (e) {
-    try { mediaRecorder = new MediaRecorder(stream); } catch (err) { showError('MediaRecorder tidak tersedia: ' + err.message); return; }
+  } catch(e) {
+    try { mediaRecorder = new MediaRecorder(stream); } catch(err) { showError('MediaRecorder tidak tersedia: ' + err.message); return; }
   }
-
-  mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) recordedChunks.push(e.data); };
+  mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) recordedChunks.push(e.data); };
   mediaRecorder.onstop = () => {
     const blob = new Blob(recordedChunks, { type: recordedChunks[0]?.type || 'video/webm' });
     downloadBlob(blob, `video_${Date.now()}.webm`);
     showToast('Video tersimpan');
-    isRecording = false;
-    recordBtn.style.background = '';
-    recordBtn.title = 'Rekam';
+    isRecording = false; shutter.style.borderColor = '';
   };
-
   mediaRecorder.start();
-  isRecording = true;
-  recordBtn.style.background = 'rgba(255,0,0,0.8)';
-  recordBtn.title = 'Stop';
-  showToast('Mulai rekam');
+  isRecording = true; shutter.style.borderColor = 'rgba(255,0,0,0.8)'; showToast('Mulai rekam');
 }
+function stopRecording() { if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); }
 
-function stopRecording() {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-}
-
-/* Shutter click behavior depending on mode */
+/* Shutter click behavior according to mode */
 shutter.addEventListener('click', async () => {
-  if (currentMode === 'photo') {
-    await takePhoto();
-  } else if (currentMode === 'live') {
-    await takeLivePhoto({ burstCount: 3, gapMs: 140 });
-  } else if (currentMode === 'video') {
-    if (!isRecording) {
-      await startRecording();
-    } else {
-      stopRecording();
-    }
-  }
+  if (currentMode === 'photo') await takePhoto();
+  else if (currentMode === 'live') await takeLivePhoto({ burstCount: 3, gapMs: 140 });
+  else if (currentMode === 'video') { if (!isRecording) await startRecording(); else stopRecording(); }
 });
 
-/* Record button duplicate for convenience */
-recordBtn.addEventListener('click', async () => {
-  if (isRecording) stopRecording(); else startRecording();
+/* Live icon click toggles mode to live */
+liveIcon.addEventListener('click', () => {
+  modesRow.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
+  const el = Array.from(modesRow.children).find(x => x.dataset.mode === 'live');
+  if (el) el.classList.add('active');
+  currentMode = 'live';
 });
 
-/* initial start */
-(async ()=> {
+/* Init on load */
+(async ()=>{
   try {
-    // check API availability quick
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       showError('getUserMedia tidak tersedia di browser ini.');
       return;
     }
     await startCamera();
   } catch (e) {
-    showError('Inisialisasi kamera gagal: ' + e.message);
+    showError('Inisialisasi kamera gagal: ' + (e?.message || e));
   }
 })();
 
-/* cleanup on page unload */
+/* cleanup on unload */
 window.addEventListener('beforeunload', ()=> stopStream());
 
-/* keyboard quick test (dev) */
-window.addEventListener('keydown', (e)=> {
-  if (e.key === 'l') { takeLivePhoto(); }
-  if (e.key === 'p') { takePhoto(); }
-  if (e.key === 'v') { isRecording ? stopRecording() : startRecording(); }
+/* keyboard shortcuts for dev */
+window.addEventListener('keydown', (ev)=> {
+  if (ev.key === 'l') takeLivePhoto();
+  if (ev.key === 'p') takePhoto();
+  if (ev.key === 'v') { isRecording ? stopRecording() : startRecording(); }
 });
-
 </script>
 </body>
 </html>
