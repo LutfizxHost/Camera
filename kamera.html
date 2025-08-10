@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kamera Foto Live</title>
+<style>
+    body {
+        margin: 0;
+        background: #000;
+        color: white;
+        font-family: sans-serif;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+    }
+    video {
+        flex: 1;
+        object-fit: cover;
+        width: 100%;
+        height: auto;
+    }
+    .bottom-nav {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        overflow-x: auto;
+    }
+    .mode {
+        margin: 0 15px;
+        cursor: pointer;
+        opacity: 0.6;
+        transition: 0.3s;
+    }
+    .mode.active {
+        opacity: 1;
+        font-weight: bold;
+        color: #ffcc00;
+    }
+    .shutter {
+        position: absolute;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        border: 5px solid white;
+        background: transparent;
+        cursor: pointer;
+    }
+    .flash-effect {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: white;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s;
+    }
+    .switch-cam {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        background: rgba(0,0,0,0.5);
+        border: none;
+        padding: 10px;
+        border-radius: 50%;
+        cursor: pointer;
+    }
+    .switch-cam svg {
+        width: 24px;
+        height: 24px;
+        fill: white;
+    }
+    .error-log {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(255,0,0,0.5);
+        padding: 5px 10px;
+        font-size: 12px;
+        border-radius: 5px;
+        max-width: 90%;
+        display: none;
+    }
+</style>
+</head>
+<body>
+
+<video id="camera" autoplay playsinline></video>
+<div class="flash-effect" id="flash"></div>
+<button class="shutter" id="shutter"></button>
+
+<!-- Tombol switch kamera dengan ikon SVG -->
+<button class="switch-cam" id="switchBtn">
+    <svg viewBox="0 0 24 24">
+        <path d="M12 6V4l-4 4 4 4V8c2.21 0 4 1.79 4 4 0 .34-.04.67-.1.99l1.53 1.53c.37-.78.57-1.65.57-2.52 0-3.31-2.69-6-6-6zm6.64 3.36L17.11 7.83C17.48 7.05 17.68 6.18 17.68 5.31c0-3.31-2.69-6-6-6S5.68 2 5.68 5.31c0 .87.2 1.74.57 2.52l-1.53 1.53C4.04 9.33 4 9.66 4 10c0 2.21 1.79 4 4 4v2l4-4-4-4v2c-1.1 0-2 .9-2 2 0 .34.04.67.1.99l1.53-1.53c-.37-.78-.57-1.65-.57-2.52 0-3.31 2.69-6 6-6s6 2.69 6 6c0 .87-.2 1.74-.57 2.52l1.53 1.53c.06-.32.1-.65.1-.99 0-2.21-1.79-4-4-4z"/>
+    </svg>
+</button>
+
+<div class="bottom-nav" id="nav">
+    <div class="mode active" data-mode="foto">Foto</div>
+    <div class="mode" data-mode="fotolive">Foto Live</div>
+    <div class="mode" data-mode="video">Video</div>
+</div>
+
+<div class="error-log" id="errorLog"></div>
+
+<script>
+let stream;
+let mediaRecorder;
+let recordedChunks = [];
+let currentMode = "foto";
+let track;
+let useBackCamera = true;
+const errorLog = document.getElementById("errorLog");
+
+function showError(message) {
+    errorLog.innerText = message;
+    errorLog.style.display = "block";
+}
+
+async function startCamera() {
+    if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+    }
+
+    let facing = useBackCamera ? "environment" : "user";
+
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: facing } },
+            audio: currentMode === "video"
+        });
+    } catch (err) {
+        console.warn("Kamera", facing, "gagal:", err);
+        showError("Kamera " + facing + " gagal: " + err.message);
+        facing = useBackCamera ? "user" : "environment";
+        useBackCamera = !useBackCamera;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: facing },
+                audio: currentMode === "video"
+            });
+        } catch (err2) {
+            showError("Fallback kamera juga gagal: " + err2.message);
+            return;
+        }
+    }
+
+    document.getElementById("camera").srcObject = stream;
+    track = stream.getVideoTracks()[0];
+    errorLog.style.display = "none"; // sembunyikan error kalau berhasil
+}
+
+function flashScreen() {
+    let flash = document.getElementById("flash");
+    flash.style.opacity = "1";
+    setTimeout(() => flash.style.opacity = "0", 150);
+}
+
+async function takePhoto(liveFlash = false) {
+    if (liveFlash && track && track.getCapabilities().torch) {
+        try {
+            await track.applyConstraints({ advanced: [{ torch: true }] });
+            setTimeout(() => track.applyConstraints({ advanced: [{ torch: false }] }), 200);
+        } catch (e) {
+            console.warn("Torch gagal:", e);
+            flashScreen();
+        }
+    } else {
+        flashScreen();
+    }
+
+    let canvas = document.createElement("canvas");
+    canvas.width = camera.videoWidth;
+    canvas.height = camera.videoHeight;
+    canvas.getContext("2d").drawImage(camera, 0, 0);
+    let imgURL = canvas.toDataURL("image/jpeg");
+
+    let a = document.createElement("a");
+    a.href = imgURL;
+    a.download = `photo_${Date.now()}.jpg`;
+    a.click();
+}
+
+function startVideoRecording() {
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+    };
+    mediaRecorder.onstop = saveVideo;
+    mediaRecorder.start();
+}
+
+function stopVideoRecording() {
+    mediaRecorder.stop();
+}
+
+function saveVideo() {
+    let blob = new Blob(recordedChunks, { type: "video/mp4" });
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement("a");
+    a.href = url;
+    a.download = `video_${Date.now()}.mp4`;
+    a.click();
+}
+
+document.getElementById("shutter").addEventListener("click", () => {
+    if (currentMode === "foto") takePhoto();
+    if (currentMode === "fotolive") takePhoto(true);
+    if (currentMode === "video") {
+        if (!mediaRecorder || mediaRecorder.state === "inactive") {
+            startVideoRecording();
+            document.getElementById("shutter").style.background = "red";
+        } else {
+            stopVideoRecording();
+            document.getElementById("shutter").style.background = "transparent";
+        }
+    }
+});
+
+document.getElementById("switchBtn").addEventListener("click", () => {
+    useBackCamera = !useBackCamera;
+    startCamera();
+});
+
+document.querySelectorAll(".mode").forEach(m => {
+    m.addEventListener("click", () => {
+        document.querySelectorAll(".mode").forEach(el => el.classList.remove("active"));
+        m.classList.add("active");
+        currentMode = m.dataset.mode;
+        startCamera();
+    });
+});
+
+startCamera();
+</script>
+
+</body>
+</html>
